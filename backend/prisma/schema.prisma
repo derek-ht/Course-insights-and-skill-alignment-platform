@@ -1,0 +1,126 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  STUDENT
+  ACADEMIC
+  ADMIN
+  ACADEMIC_ADMIN
+}
+
+model User {
+  id              String          @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String          @unique
+  pwHash          String
+  pwSalt          String
+  phoneNumber     String?
+  school          String?
+  degree          String?
+  avatar          String          @default("http://127.0.0.1:3000/imgurl/default.jpg")
+  workExperience  String[]        @default([])
+  type            UserType        @default(STUDENT)
+  // list of projects the user has created as an academic
+  ownedProjects   Project[]
+  // list of courses the user has created/added as an academic
+  ownedCourses    Course[]        @relation("CourseOwner")
+  // list of courses the user has completed
+  courses         Course[]        @relation("CourseUser")
+  // list of groups the user is a member of
+  groups          Group[]         @relation("members")
+  // list of groups the user is invited to
+  groupInvites    Group[]         @relation("invites")
+  // list of groups the user has requested to join
+  groupRequests   Group[]         @relation("requests")
+  // list of users that have access to this user's profile
+  sharedWithUsers SharedProfile[] @relation("profileOwner")
+  // list of users whose profiles this user has access to
+  sharedProfiles  SharedProfile[] @relation("sharedProfiles")
+  public          Boolean         @default(true)
+  skills          String          @default("[]")
+}
+
+// A user that has not yet verified their email address
+model UnverifiedUser {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  pwHash    String
+  pwSalt    String
+  iat       DateTime @default(now())
+  firstName String
+  lastName  String
+  type      UserType @default(STUDENT)
+}
+
+// Table to represent the many-to-many relationship of users sharing profiles
+model SharedProfile {
+  profileOwner   User   @relation("profileOwner", fields: [profileOwnerId], references: [id], onDelete: Cascade)
+  profileOwnerId String
+  sharedWith     User   @relation("sharedProfiles", fields: [sharedWithId], references: [id], onDelete: Cascade)
+  sharedWithId   String
+
+  @@id([profileOwnerId, sharedWithId])
+}
+
+model Course {
+  id      String   @id @default(uuid())
+  code    String
+  title   String
+  year    String
+  iat     DateTime @default(now())
+  summary String
+  owner   User?    @relation(fields: [ownerId], references: [id], name: "CourseOwner", onDelete: SetNull)
+  ownerId String?
+  // List of users that have completed this course
+  users   User[]   @relation("CourseUser")
+
+  @@unique([code, year])
+}
+
+model Project {
+  id             String   @id @default(uuid())
+  owner          User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId        String?
+  title          String
+  description    String
+  topics         String[]
+  scope          String
+  requiredSkills String[]
+  outcomes       String[]
+  // List of groups that are currently doing this project
+  groups         Group[]
+  coverPhoto     String   @default("http://127.0.0.1:3000/imgurl/default-project.jpg")
+  // Maximum group size eligibile to participate in this project
+  maxGroupSize   Int?
+  // Minimum group size eligibile to participate in this project
+  minGroupSize   Int?
+  // Maximum number of groups eligibile to participate in this project
+  maxGroupCount  Int?
+}
+
+model Group {
+  id           String   @id @default(uuid())
+  name         String
+  // List of users that are members of this group
+  members      User[]   @relation("members")
+  // List of users that have been invited to this group
+  invitedUsers User[]   @relation("invites")
+  // List of users that have requested to join this group
+  userRequests User[]   @relation("requests")
+  description  String   @default("")
+  size         Int      @default(5)
+  coverPhoto   String   @default("http://127.0.0.1:3000/imgurl/default-group.jpg")
+  project      Project? @relation(fields: [projectId], references: [id])
+  projectId    String?
+  skills       String   @default("[]")
+}
